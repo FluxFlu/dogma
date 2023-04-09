@@ -1,26 +1,32 @@
 #!/usr/bin/env node
 
+const compiler_flags = {
+    "type": "node",
+    "make-script": "true",
+    "ignore-early-fn-name-check": "false",
+}
+
 function getCompilerFlags() { return compiler_flags }
 
 
 const fileData = {
     current_file: "",
-    entryPoint: ""
+    entryPoint: "",
+    line: 0,
 }
 
-module.exports = { getCompilerFlags, fileData }
-
-const fs = require("fs");
-const path = require("path");
-const { cook } = require("./code/cook");
-const { finalize } = require("./code/final");
-const { handleFlag, definitions, publicDefinitions } = require("./code/flag");
-const { handleDefinitions } = require("./code/sub_definitions");
-const { Tokenize, token } = require("./code/tokenizer");
-const { tokenGroup } = require("./code/token_group");
+function updateLine(token) {
+    if (token.type == "Line Break" && token.value != '\n')
+        fileData.line = token.value
+}
 
 const errors = {
     "no_filename_specified": "`No filename specified or invalid filename. Keep in mind that the filename must be the first argument.`",
+    "early_fn_name": "`Direct specification of \\`dogma_early_fn_[0-9]*\\` not allowed. This can be ignored using \\`--ignore-early-fn-name-check true\\`, but this is not supported behavior, and will likely lead to bugs.`"
+}
+
+function getLine() {
+    return fileData.line;
 }
 
 function log_error(error, serious, ...args) {
@@ -49,11 +55,26 @@ function log_compiler_error(error, serious) {
     }
 }
 
+module.exports = { getCompilerFlags, fileData, updateLine, log_error, log_compiler_error }
+
+const fs = require("fs");
+const path = require("path");
+const { checkInvalidNames } = require("./code/check_invalid_names");
+const { cook } = require("./code/cook");
+const { handleEarlyFunctions } = require("./code/early_function");
+const { finalize } = require("./code/final");
+const { handleFlag, definitions, publicDefinitions } = require("./code/flag");
+const { handleDefinitions } = require("./code/sub_definitions");
+const { Tokenize, token } = require("./code/tokenizer");
+const { tokenGroup } = require("./code/token_group");
+
 function compile(filename) {
     fileData.current_file = filename;
     publicDefinitions[filename] = definitions[filename] = {}
 
     const file = Tokenize(filename, fs.readFileSync(filename, "utf-8").replaceAll(/\/\/.*?(?=$)/gm, ''));
+
+    checkInvalidNames(file);
 
     for (let i in file) {
         const token = file[i];
@@ -66,7 +87,8 @@ function compile(filename) {
                 if (file[i].value == ']') brack--;
                 flag.push(file.splice(i, 1)[0]);
             }
-            file.splice(back, 0, {type: "post_flag", value: handleFlag(compile, filename, flag)});
+            const flag_out = handleFlag(compile, filename, flag, i);
+            file.splice(back, 0, {type: flag_out.is_real ? "post_flag" : "compiler_value", value: flag_out.value});
         }
     }
 
@@ -77,13 +99,10 @@ function compile(filename) {
         preDefinitions = postDefinitions.map(e => token(e.type, e.value));
         postDefinitions = handleDefinitions(filename, postDefinitions);
     }
-    
-    return finalize(filename, cook(filename, postDefinitions));
-}
 
-const compiler_flags = {
-    "type": "node",
-    "make-script": "true"
+    const final = handleEarlyFunctions(filename, cook(filename, postDefinitions))
+    
+    return finalize(filename, final);
 }
 
 function main() {

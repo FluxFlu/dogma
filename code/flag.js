@@ -10,9 +10,10 @@ const definitions = {};
 const publicDefinitions = {}
 
 
-function handleFlag(compile, filename, line) {
+function handleFlag(compile, filename, line, token_number) {
     line.shift();
     const fn = line.shift().value;
+    let real_value = true;
     let flag = line.map(e => e.value);
     let brack = 0;
     const values = [[]];
@@ -99,18 +100,25 @@ function handleFlag(compile, filename, line) {
             }
             break;
         }
+        case "fn_location": {
+            final = "FN_LOCATION";
+            real_value = false;
+            break;
+        }
         case "with": {
             switch (getCompilerFlags()["type"]) {
                 case "node": {
                     final = "#!" + flag.slice(1, -1).join(' ')
                         .replaceAll('/ ', '/')
                         .replaceAll(' /', '/')
+                    break;
                 }
             }
+            break;
         }
     }
 
-    return final;
+    return {value: final, is_real: real_value};
 }
 
 module.exports = { handleFlag, definitions, publicDefinitions, validTypes }

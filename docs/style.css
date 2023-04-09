@@ -25,6 +25,9 @@ a {
 comment {
     color: #005910;
 }
+highlight {
+    color: #8d0000;
+}
 cb {
     background-color: #b0b0b0;
     border-radius: .8vh .8vh;
