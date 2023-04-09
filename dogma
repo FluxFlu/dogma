@@ -123,6 +123,8 @@ function main() {
 
     fs.writeFileSync(outfile, file);
 
+    console.log("Successfully compiled " + filename + " to " + outfile + ".")
+
     // chmod +x
     if (compiler_flags["make-script"] == "true")
         fs.chmodSync(outfile, 500)
