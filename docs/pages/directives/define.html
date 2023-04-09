@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Dogma | Define</title>
+        <link rel="icon" type="image/x-icon" href="../../assets/Dogma.png">
+        <link rel="stylesheet" type="text/css" href="../../style.css"/>
+    </head>
+    <body><br><br>
+        <h1>
+            Define
+        </h1>
+        <div>
+
+
+<h>What is the define directive</h>
+
+<p>
+The <cb>#define</cb> directive is used to create macros.
+</p>
+
+<br><br><br><br>
+<h>How to use</h>
+
+<p>
+The define directive follows the syntax of <cb>#define [from] [to] as [name]</cb>. You can also use <cb>#define [from] [to]</cb>, and the [name] of the macro will be the same as the [from]
+</p>
+
+<br><br><br><br>
+<h>What is a macro</h>
+
+<p>
+A macro is a token that is substituted for another value at compile time.
+</p>
+
+<br><br><br><br>
+<h>Example:</h>
+<pre>
+
+#define [x] [500]
+
+console.log(x);
+
+</pre>
+
+<p>This will compile to:</p>
+
+<pre>
+
+console.log(500);
+
+</pre>
+<br><br><br><br>
+<h>Looping during compilation</h>
+
+<p>
+During compilation, the application of macros will loop until there are no changes. This means the following is possible:
+</p>
+
+<pre>
+
+#define [x] [500]
+#define [y] [x + 200]
+
+console.log(y);
+
+</pre>
+
+<p>This will compile to:</p>
+
+<pre>
+
+console.log(500 + 200);
+
+</pre>
+<br><br><br><br>
+<h>Arguments</h>
+
+<p>
+Arguments can be used as part of macros, the same way one would do in a function.
+
+This is done with the syntax <cb>#define [$argument] [$argument]</cb>
+</p>
+
+<pre>
+
+#define [add($x, $y)] [$x + $y]
+
+console.log(add(1, 2));
+
+</pre>
+
+<p>This will compile to:</p>
+
+<pre>
+
+console.log(1 + 2);
+
+</pre>
+<br><br><br><br>
+<h>Token Grouping</h>
+
+<p>
+Tokens can be grouped so they are treated as a single argument for macro purposes.
+
+This is done with the syntax <cb>$(tokens)</cb>
+</p>
+
+<pre>
+
+#define [add($x, $y)] [$x + $y]
+
+console.log(add($(1 + 10), 2));
+
+</pre>
+
+<p>This will compile to:</p>
+
+<pre>
+
+console.log((1 + 10) + 2);
+
+</pre>
+
+<p>
+Macros cannot be used within token groups. This means the following does not compile:
+</p>
+
+<pre>
+    
+#define [x] [1]
+
+#define [add($x, $y)] [$x + $y]
+
+console.log(add($(x + 10), 2));
+
+</pre>
+        </div>
+    </body>
+</html>

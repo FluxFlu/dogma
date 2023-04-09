@@ -1,0 +1,133 @@
+#!/usr/bin/env node
+
+function getCompilerFlags() { return compiler_flags }
+
+
+const fileData = {
+    current_file: "",
+    entryPoint: ""
+}
+
+module.exports = { getCompilerFlags, fileData }
+
+const fs = require("fs");
+const path = require("path");
+const { cook } = require("./code/cook");
+const { finalize } = require("./code/final");
+const { handleFlag, definitions, publicDefinitions } = require("./code/flag");
+const { handleDefinitions } = require("./code/sub_definitions");
+const { Tokenize, token } = require("./code/tokenizer");
+const { tokenGroup } = require("./code/token_group");
+
+const errors = {
+    "no_filename_specified": "`No filename specified or invalid filename. Keep in mind that the filename must be the first argument.`",
+}
+
+function log_error(error, serious, ...args) {
+    if (serious) {
+        let i = 0;
+        if (errors[error])
+            while (errors[error].match(/(?<!format_args\()args\[[0-9]*\]/))
+                errors[error] = errors[error].replace(/(?<!format_args\()args\[[0-9]*\]/, `format_args(args[${i++}])`)
+        console.error("\u001b[31m\033[1mError: \u001b[0m\033[0m" + eval(errors[error]) + '\n # File `' + fileData.current_file + '`\n # Line ' + getLine());
+        compiles = false;
+        throw error;
+    } else {
+        console.warn("\u001b[33m\033[1mWarning: \u001b[0m\033[0m" + eval(errors[error]) + '\n # File `' + fileData.current_file + '`\n # Line ' + getLine());
+    }
+}
+
+
+function log_compiler_error(error, serious) {
+    const e = eval(errors[error]);
+    if (serious) {
+        console.error("\u001b[31m\033[1mError: \u001b[0m\033[0m" + e);
+        compiles = false;
+        throw error;
+    } else {
+        console.warn("\u001b[33m\033[1mWarning: \u001b[0m\033[0m" + e);
+    }
+}
+
+function compile(filename) {
+    fileData.current_file = filename;
+    publicDefinitions[filename] = definitions[filename] = {}
+
+    const file = Tokenize(filename, fs.readFileSync(filename, "utf-8").replaceAll(/\/\/.*?(?=$)/gm, ''));
+
+    for (let i in file) {
+        const token = file[i];
+        if (token.value == '#') {
+            const flag = []
+            const back = i;
+            let brack = 0;
+            while (file[i] && (file[i].type != "Line Break" || brack)) {
+                if (file[i].value == '[') brack++;
+                if (file[i].value == ']') brack--;
+                flag.push(file.splice(i, 1)[0]);
+            }
+            file.splice(back, 0, {type: "post_flag", value: handleFlag(compile, filename, flag)});
+        }
+    }
+
+    let preDefinitions = tokenGroup(filename, cook(filename, file))
+    let postDefinitions = handleDefinitions(filename, preDefinitions.map(e => token(e.type, e.value)));
+    
+    while (postDefinitions.length != preDefinitions.length || postDefinitions.map((e, i) => e.value == preDefinitions[i].value && e.type == preDefinitions[i].type).filter(e => !e).length) {
+        preDefinitions = postDefinitions.map(e => token(e.type, e.value));
+        postDefinitions = handleDefinitions(filename, postDefinitions);
+    }
+    
+    return finalize(filename, cook(filename, postDefinitions));
+}
+
+const compiler_flags = {
+    "type": "node",
+    "make-script": "true"
+}
+
+function main() {
+    const args = process.argv.slice(2);
+    
+    if (args[0].includes('--docs')) {
+        console.log("File Path:\033[1;32m " + path.join(__dirname, "docs/index.html\033[0;37m\n"))
+        console.log("URL:      \033[1;32m " + "file://" + path.join(__dirname, "docs/index.html\033[0;37m\n"))
+        process.exit(0);
+    } else if (args.includes('--help')) {
+        console.log("Usage: dogma [file.dm] [options]\n\nLocate documentation with \033[1;32mdogma --docs\033[0;37m.")
+        process.exit(0);
+    }
+
+    const filename = args.shift();
+    if (!filename || filename[0] == '-')
+        log_compiler_error("no_filename_specified", true)
+    
+    fileData.entryPoint = filename;
+
+    for (let i = 0; i < args.length; i += 2) compiler_flags[args[i].slice(2)] = args[i + 1]
+
+
+    let file = compile(filename);
+
+    // Add in shebangs
+    if (compiler_flags["make-script"] == "true" && !file.match(/^#!(.*)/gm)) {
+        switch (compiler_flags.type) {
+            case "node": {
+                    file = '#!/usr/bin/env node\n\n' + file
+                break;
+            }
+        }
+    }
+
+    const outfile = filename.replace("dm", "js");
+
+    fs.writeFileSync(outfile, file);
+
+    // chmod +x
+    if (compiler_flags["make-script"] == "true")
+        fs.chmodSync(outfile, 500)
+
+    return 0;
+}
+
+process.exit(main());
